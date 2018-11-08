@@ -3,6 +3,7 @@
 
 import logging
 import time
+import serial
 from os import listdir
 from os.path import join, isdir
 try:
@@ -26,11 +27,21 @@ except ImportError:
 
 class ScannerDevice():
     def __init__(self, path):
-        self.evdev = evdev.InputDevice(path)
-        self.evdev.grab()
+        #self.evdev = evdev.InputDevice(path)
+        #self.evdev.grab()
+        self.ser = serial.Serial()
+        self.ser.port = path
+        self.ser.baudrate = 9600
+        self.ser.timeout = 3
+        self.ser.open()
 
         self.barcode = []
         self.shift = False
+
+    def __del__(self):
+        #if self.ser:
+        #    self.ser.close()
+        self.ser = None
 
 class Scanner(Thread):
     def __init__(self):
@@ -115,30 +126,51 @@ class Scanner(Thread):
                 self.status['messages'] = []
 
         if status == 'error' and message:
-            _logger.error('Barcode Scanner Error: '+message)
+            _logger.error('Barcode Scanner Error: %s' % message)
         elif status == 'disconnected' and message:
-            _logger.info('Disconnected Barcode Scanner: %s', message)
+            _logger.info('Disconnected Barcode Scanner: %s' % message)
+
+    # def get_devices_orig(self):
+    #     try:
+    #         if not evdev:
+    #             return []
+    #
+    #         if not isdir(self.input_dir):
+    #             return []
+    #
+    #         new_devices = [device for device in listdir(self.input_dir)
+    #                        if join(self.input_dir, device) not in [dev.evdev.fn for dev in self.open_devices]]
+    #         scanners = [device for device in new_devices
+    #                     if (('kbd' in device) and ('keyboard' not in device.lower()))
+    #                     or ('barcode' in device.lower()) or ('scanner' in device.lower())]
+    #
+    #         for device in scanners:
+    #             _logger.debug('opening device %s', join(self.input_dir,device))
+    #             self.open_devices.append(ScannerDevice(join(self.input_dir,device)))
+    #
+    #         if self.open_devices:
+    #             self.set_status('connected','Connected to '+ str([dev.evdev.name for dev in self.open_devices]))
+    #         else:
+    #             self.set_status('disconnected','Barcode Scanner Not Found')
+    #
+    #         return self.open_devices
+    #     except Exception as e:
+    #         self.set_status('error',str(e))
+    #         return []
 
     def get_devices(self):
         try:
-            if not evdev:
-                return []
+            scanners = ['/dev/ttyS1']
 
-            if not isdir(self.input_dir):
-                return []
+            new_devices = [scanner for scanner in scanners
+                           if scanner not in [dev.ser.name for dev in self.open_devices]]
 
-            new_devices = [device for device in listdir(self.input_dir)
-                           if join(self.input_dir, device) not in [dev.evdev.fn for dev in self.open_devices]]
-            scanners = [device for device in new_devices
-                        if (('kbd' in device) and ('keyboard' not in device.lower()))
-                        or ('barcode' in device.lower()) or ('scanner' in device.lower())]
-
-            for device in scanners:
-                _logger.debug('opening device %s', join(self.input_dir,device))
-                self.open_devices.append(ScannerDevice(join(self.input_dir,device)))
+            for device in new_devices:
+                _logger.debug('opening device %s' % device)
+                self.open_devices.append(ScannerDevice(device))
 
             if self.open_devices:
-                self.set_status('connected','Connected to '+ str([dev.evdev.name for dev in self.open_devices]))
+                self.set_status('connected','Connected to %s' % str([dev.ser.name for dev in self.open_devices]))
             else:
                 self.set_status('disconnected','Barcode Scanner Not Found')
 
@@ -171,63 +203,108 @@ class Scanner(Thread):
         self.lockedstart()
         return self.status
 
+    # def _get_open_device_by_fd_orig(self, fd):
+    #     for dev in self.open_devices:
+    #         if dev.evdev.fd == fd:
+    #             return dev
+
     def _get_open_device_by_fd(self, fd):
         for dev in self.open_devices:
-            if dev.evdev.fd == fd:
+            if dev.ser.fileno() == fd:
                 return dev
+
+    # def run_orig(self):
+    #     """ This will start a loop that catches all keyboard events, parse barcode
+    #         sequences and put them on a timestamped queue that can be consumed by
+    #         the point of sale's requests for barcode events
+    #     """
+    #
+    #     self.barcodes = Queue()
+    #
+    #     barcode  = []
+    #     shift    = False
+    #     devices  = None
+    #
+    #     while True: # barcodes loop
+    #         devices = self.get_devices()
+    #
+    #         try:
+    #             while True: # keycode loop
+    #                 r,w,x = select({dev.fd: dev for dev in [d.evdev for d in devices]},[],[],5)
+    #                 if len(r) == 0: # timeout
+    #                     break
+    #
+    #                 for fd in r:
+    #                     device = self._get_open_device_by_fd(fd)
+    #
+    #                     if not evdev.util.is_device(device.evdev.fn):
+    #                         _logger.info('%s disconnected', str(device.evdev))
+    #                         self.release_device(device)
+    #                         break
+    #
+    #                     events = device.evdev.read()
+    #
+    #                     for event in events:
+    #                         if event.type == evdev.ecodes.EV_KEY:
+    #                             # _logger.debug('Evdev Keyboard event %s',evdev.categorize(event))
+    #                             if event.value == 1: # keydown events
+    #                                 if event.code in self.keymap:
+    #                                     if device.shift:
+    #                                         device.barcode.append(self.keymap[event.code][1])
+    #                                     else:
+    #                                         device.barcode.append(self.keymap[event.code][0])
+    #                                 elif event.code == 42 or event.code == 54: # SHIFT
+    #                                     device.shift = True
+    #                                 elif event.code == 28: # ENTER, end of barcode
+    #                                     _logger.debug('pushing barcode %s from %s', ''.join(device.barcode), str(device.evdev))
+    #                                     self.barcodes.put( (time.time(),''.join(device.barcode)) )
+    #                                     device.barcode = []
+    #                             elif event.value == 0: #keyup events
+    #                                 if event.code == 42 or event.code == 54: # LEFT SHIFT
+    #                                     device.shift = False
+    #
+    #         except Exception as e:
+    #             self.set_status('error',str(e))
+
 
     def run(self):
         """ This will start a loop that catches all keyboard events, parse barcode
             sequences and put them on a timestamped queue that can be consumed by
-            the point of sale's requests for barcode events 
+            the point of sale's requests for barcode events
         """
-        
-        self.barcodes = Queue()
-        
-        barcode  = []
-        shift    = False
-        devices  = None
 
-        while True: # barcodes loop
+        self.barcodes = Queue()
+
+        barcode = []
+        shift = False
+        devices = None
+
+        while True:  # barcodes loop
             devices = self.get_devices()
 
             try:
-                while True: # keycode loop
-                    r,w,x = select({dev.fd: dev for dev in [d.evdev for d in devices]},[],[],5)
-                    if len(r) == 0: # timeout
+                while True:  # keycode loop
+                    r, w, x = select({dev.fileno(): dev for dev in [d.ser for d in devices]}, [], [], 5)
+                    if len(r) == 0:  # timeout
                         break
 
                     for fd in r:
                         device = self._get_open_device_by_fd(fd)
 
-                        if not evdev.util.is_device(device.evdev.fn):
-                            _logger.info('%s disconnected', str(device.evdev))
+                        if not device.ser.isOpen():
+                            _logger.info('%s disconnected' % str(device.ser.name))
                             self.release_device(device)
                             break
 
-                        events = device.evdev.read()
+                        barcodes = device.ser.readline()
 
-                        for event in events:
-                            if event.type == evdev.ecodes.EV_KEY:
-                                # _logger.debug('Evdev Keyboard event %s',evdev.categorize(event))
-                                if event.value == 1: # keydown events
-                                    if event.code in self.keymap:
-                                        if device.shift:
-                                            device.barcode.append(self.keymap[event.code][1])
-                                        else:
-                                            device.barcode.append(self.keymap[event.code][0])
-                                    elif event.code == 42 or event.code == 54: # SHIFT
-                                        device.shift = True
-                                    elif event.code == 28: # ENTER, end of barcode
-                                        _logger.debug('pushing barcode %s from %s', ''.join(device.barcode), str(device.evdev))
-                                        self.barcodes.put( (time.time(),''.join(device.barcode)) )
-                                        device.barcode = []
-                                elif event.value == 0: #keyup events
-                                    if event.code == 42 or event.code == 54: # LEFT SHIFT
-                                        device.shift = False
+                        for barcode in barcodes.split():
+                            self.barcodes.put((time.time(), barcode))
+                            _logger.info('pushing barcode %s from %s' % (str(barcode), str(device.ser.name)))
 
             except Exception as e:
-                self.set_status('error',str(e))
+                self.set_status('error', str(e))
+
 
 scanner_thread = None
 if evdev:
