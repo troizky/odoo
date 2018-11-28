@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<odoo>
+
+    <record id="pos_config_view_form" model="ir.ui.view">
+        <field name="name">pos_customer_display.pos.config.form</field>
+        <field name="model">pos.config</field>
+        <field name="inherit_id" ref="point_of_sale.pos_config_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div/field[@name='iface_print_via_proxy']/.." position="after">
+                <div class="row">
+                    <label string="Customer Display" for="iface_customer_display" class="col-md-3 o_light_label"/>
+                    <field name="iface_customer_display"/>
+                </div>
+                <div class="row">
+                    <label string="Customer Display Width" for="customer_display_width" class="col-md-3 o_light_label"/>
+                    <field name="customer_display_width"/>
+                </div>
+            </xpath>
+            <!--
+            <xpath expr="//div/field[@name='iface_cashdrawer']/.." position="after">
+                <div class="row">
+                    <label string="Next Customer Message" name="next_customer" colspan="2"/>
+                    <field name="customer_display_msg_next_l1" string="Top Line"/>
+                    <field name="customer_display_msg_next_l2" string="Bottom Line"/>
+                </div>
+                <div class="row">
+                    <label string="POS Closed Message" name="pos_closed" colspan="2"/>
+                    <field name="customer_display_msg_closed_l1" string="Top Line"/>
+                    <field name="customer_display_msg_closed_l2" string="Bottom Line"/>
+                </div>
+            </xpath>
+            -->
+        </field>
+    </record>
+
+</odoo>
