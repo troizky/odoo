@@ -47,10 +47,10 @@ class PosConfig(models.Model):
                 _('POS Closed (bottom line)'):
                 self.customer_display_msg_closed_l2,
             }
-            for field, msg in to_check.iteritems():
-                if msg and len(msg.decode('utf8')) > maxsize:
+            for field, msg in iter(to_check.items()):
+                if msg and len(msg) > maxsize:
                     raise ValidationError(_(
                         "The message for customer display '%s' is too "
                         "long: it has %d chars whereas the maximum "
                         "is %d chars.")
-                        % (field, len(msg.decode('utf8')), maxsize))
+                        % (field, len(msg), maxsize))
