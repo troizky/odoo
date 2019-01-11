@@ -118,6 +118,8 @@ class HardwareScreen(web.Home):
 
         display_ifaces = ""
         for iface_id in interfaces:
+            if iface_id.startswith('docker'):
+                continue
             iface_obj = ni.ifaddresses(iface_id)
             ifconfigs = iface_obj.get(ni.AF_INET, [])
             for conf in ifconfigs:

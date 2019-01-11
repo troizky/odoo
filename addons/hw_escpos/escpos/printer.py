@@ -175,6 +175,9 @@ class Serial(Escpos):
         else:
             print("Unable to open serial printer on: %s" % self.devfile)
 
+    def close(self):
+        if self.device:
+            self.device.close()
 
     def _raw(self, msg):
         """ Print any command sent in raw format """
@@ -209,6 +212,9 @@ class Network(Escpos):
         if self.device is None:
             print("Could not open socket for %s" % self.host)
 
+    def close(self):
+        if self.device:
+            self.device.close()
 
     def _raw(self, msg):
         self.device.send(msg)

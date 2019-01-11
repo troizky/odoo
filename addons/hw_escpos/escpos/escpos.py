@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from __future__ import print_function
+import sys
 import base64
 import copy
 import io
@@ -441,7 +442,10 @@ class Escpos:
 
             img = img[img.find(b',')+1:]
             f = io.BytesIO(b'img')
-            f.write(base64.decodebytes(img))
+            if sys.version_info.major > 2:
+                f.write(base64.decodebytes(img))
+            else:
+                f.write(base64.decodestring(img))
             f.seek(0)
             img_rgba = Image.open(f)
             img = Image.new('RGB', img_rgba.size, (255,255,255))
@@ -678,7 +682,10 @@ class Escpos:
 
             elif elem.tag == 'img':
                 if 'src' in elem.attrib and 'data:' in elem.attrib['src']:
-                    self.print_base64_image(bytes(elem.attrib['src'], 'utf-8'))
+                    if sys.version_info.major > 2:
+                        self.print_base64_image(bytes(elem.attrib['src'], 'utf-8'))
+                    else:
+                        self.print_base64_image(elem.attrib['src'])
 
             elif elem.tag == 'barcode' and 'encoding' in elem.attrib:
                 serializer.start_block(stylestack)
@@ -805,7 +812,10 @@ class Escpos:
                 # if the encoding changed, remember it and prefix the character with
                 # the esc-pos encoding change sequence
                 self.encoding = encoding
-                encoded = bytes(encodings[encoding], 'utf-8') + encoded
+                if sys.version_info > 2:
+                    encoded = bytes(encodings[encoding], 'utf-8') + encoded
+                else:
+                    encoded = encodings[encoding] + encoded
 
             return encoded
         

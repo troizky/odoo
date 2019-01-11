@@ -2,6 +2,7 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 from __future__ import print_function
+import wnji
 import logging
 import math
 import os
@@ -10,11 +11,13 @@ import subprocess
 import time
 import netifaces as ni
 import traceback
+import serial
 
 try: 
     from .. escpos import *
     from .. escpos.exceptions import *
-    from .. escpos.printer import Usb
+    from .. escpos.printer import Usb as UsbPrinter
+    from .. escpos.printer import Serial as SerialPrinter
 except ImportError:
     escpos = printer = None
 
@@ -95,6 +98,31 @@ class EscposDriver(Thread):
 
         return connected
 
+    def connected_serial_devices(self):
+        connected = []
+
+        printers = ['/dev/ttyS0']
+        baud = 9600
+
+        for printer in printers:
+            try:
+                ser = serial.Serial()
+                ser.port = printer
+                ser.baudrate = baud
+                ser.open()
+                ser.close()
+
+                connected.append({
+                    'device': printer,
+                    'baudrate': baud,
+                    'name': 'Serial Printer'
+                })
+
+            except Exception as e:
+                _logger.error("Can not get printer description: %s" % e)
+
+        return connected
+
     def lockedstart(self):
         with self.lock:
             if not self.isAlive():
@@ -105,15 +133,24 @@ class EscposDriver(Thread):
   
         printers = self.connected_usb_devices()
         if len(printers) > 0:
-            print_dev = Usb(printers[0]['vendor'], printers[0]['product'])
+            print_dev = UsbPrinter(printers[0]['vendor'], printers[0]['product'])
             self.set_status(
                 'connected',
                 "Connected to %s (in=0x%02x,out=0x%02x)" % (printers[0]['name'], print_dev.in_ep, print_dev.out_ep)
             )
             return print_dev
         else:
-            self.set_status('disconnected','Printer Not Found')
-            return None
+            printers = self.connected_serial_devices()
+            if len(printers) > 0:
+                print_dev = SerialPrinter(printers[0]['device'], printers[0]['baudrate'])
+                self.set_status(
+                    'connected',
+                    "Connected to %s" % (printers[0]['name'])
+                )
+                return print_dev
+            else:
+                self.set_status('disconnected','Printer Not Found')
+                return None
 
     def get_status(self):
         self.push_task('status')
@@ -136,9 +173,9 @@ class EscposDriver(Thread):
                 self.status['messages'] = []
 
         if status == 'error' and message:
-            _logger.error('ESC/POS Error: %s', message)
+            _logger.error('ESC/POS Error: %s' % message)
         elif status == 'disconnected' and message:
-            _logger.warning('ESC/POS Device Disconnected: %s', message)
+            _logger.warning('ESC/POS Device Disconnected: %s' % message)
 
     def run(self):
         printer = None
@@ -183,8 +220,8 @@ class EscposDriver(Thread):
             except NoStatusError as e:
                 print("Impossible to get the status of the printer %s" % e)
             except Exception as e:
-                self.set_status('error', e)
-                _logger.exception()
+                self.set_status('error', str(e))
+                _logger.exception(e)
             finally:
                 if error:
                     self.queue.put((timestamp, task, data))
@@ -383,5 +420,5 @@ class EscposProxy(hw_proxy.Proxy):
 
     @http.route('/hw_proxy/print_xml_receipt', type='json', auth='none', cors='*')
     def print_xml_receipt(self, receipt):
-        _logger.info('ESC/POS: PRINT XML RECEIPT') 
+        _logger.info('ESC/POS: PRINT XML RECEIPT')
         driver.push_task('xml_receipt',receipt)
