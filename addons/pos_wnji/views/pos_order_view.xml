@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_pos_pos_form_wnji" model="ir.ui.view">
+        <field name="name">pos.order.form.inherit</field>
+        <field name="model">pos.order</field>
+        <field name="inherit_id" ref="point_of_sale.view_pos_pos_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//button[@name='action_pos_order_invoice']" position="before" >
+                <button name="do_smh" string="test button calling PosOrder.do_smh" class="oe_highlight" type="object" states="draft"/>
+                <button name="refund" string="Overwritten refund" type="object"  context="{'pos_session_id' : session_id, 'order_type': 'Refund'}" attrs="{'invisible':[('state','=','draft')]}"/>
+            </xpath>
+            <xpath expr="//field[@name='session_id']" position="after" >
+                <field name="order_type" />
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_pos_order_tree_wnji" model="ir.ui.view">
+        <field name="name">pos.order.tree.inherit</field>
+        <field name="model">pos.order</field>
+        <field name="inherit_id" ref="point_of_sale.view_pos_order_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='pos_reference']" position="after" >
+                <field name="order_type" />
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

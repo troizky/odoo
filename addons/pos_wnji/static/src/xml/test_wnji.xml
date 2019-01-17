@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates xml="template" xml:space="preserve">
+
+    <t t-name="print_button">
+        <button class="input-button" data-action='print'>print solo</button>
+    </t>
+    <t t-name="popup_button">
+        <button class="input-button" data-action='print'>popup solo</button>
+    </t>
+    <t t-name="off_button">
+        <button class="input-button" data-action='print'>Turn printer on/off</button>
+    </t>
+
+</templates>
